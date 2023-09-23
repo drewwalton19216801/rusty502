@@ -156,8 +156,8 @@ pub mod emulator {
             }
 
             // Clear the line and print the LED strip
-            print!("{}[2K", 27 as char);
-            print!("{}[{}D", 27 as char, 8);
+            print!("\x1B[K");
+            print!("\rLED STRIP: ");
             for i in 0..8 {
                 if unsafe { LED_STRIP[i] } {
                     print!("█");

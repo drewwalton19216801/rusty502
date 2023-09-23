@@ -13,6 +13,7 @@ mod emulator;
  *     - NMOS: The NMOS 6502 CPU
  *     - CMOS: The CMOS 65C02 CPU (default)
  *     - NES: The NES CPU (Ricoh 2A03)
+ *  -s, --speed: The speed of the CPU in MHz (default: 0.000001 (1 Hz))
  *  -b, --benchmark: Runs demos/blink.bin for 1000000 cycles and prints the results"
  *  -h, --help: Prints the help message
  */
@@ -20,7 +21,7 @@ mod emulator;
 fn main() {
     // Parse the command line arguments
     let args: Vec<String> = env::args().collect();
-    let (rom_path, address, variant, benchmark_mode) = parse_args(args);
+    let (rom_path, address, variant, speed, benchmark_mode) = parse_args(args);
 
     // Create the emulator
     let mut emulator = emulator::emulator::Emulator::new();
@@ -37,23 +38,18 @@ fn main() {
     // Change the variant of the CPU
     emulator.change_variant(variant);
 
-    // Run the emulator at 10 Hz for 100 cycles
-    let speed = 10.0 / 1_000_000.0;
-    emulator.run(speed, Some(100));
+    // Run the emulator
+    emulator.run(speed, None);
     
-    /*
-    let mut emulator = emulator::emulator::Emulator::new();
-    emulator.load_file_from_path("demos/blink.bin");
-    emulator.run();
-    */
     println!();
 }
 
-fn parse_args(args: Vec<String>) -> (String, u16, String, bool) {
+fn parse_args(args: Vec<String>) -> (String, u16, String, f64, bool) {
     // Set the default values
     let mut rom_path = String::from("demos/blink.bin");
     let mut address = 0xC000;
     let mut variant = String::from("CMOS");
+    let mut speed: f64 = 0.000001; // 1 Hz
     let mut benchmark_mode = false;
 
     // Parse the arguments
@@ -70,6 +66,10 @@ fn parse_args(args: Vec<String>) -> (String, u16, String, bool) {
             }
             "-v" | "--variant" => {
                 variant = args[i + 1].clone();
+                i += 1;
+            }
+            "-s" | "--speed" => {
+                speed = args[i + 1].parse::<f64>().unwrap();
                 i += 1;
             }
             "-b" | "--benchmark" => {
@@ -89,7 +89,7 @@ fn parse_args(args: Vec<String>) -> (String, u16, String, bool) {
     }
 
     // Return the parsed arguments
-    (rom_path, address, variant, benchmark_mode)
+    (rom_path, address, variant, speed, benchmark_mode)
 }
 
 fn print_help() {
@@ -101,6 +101,7 @@ fn print_help() {
     println!("     - NMOS: The MMOS 6502 CPU");
     println!("     - CMOS: The CMOS 65C02 CPU (default)");
     println!("     - NES: The NES CPU (Ricoh 2A03)");
+    println!("  -s, --speed: The speed of the CPU in MHz (default: 0.000001 (1 Hz))");
     println!("  -b, --benchmark: Runs demos/blink.bin for 200,000,000 cycles and prints the results");
     println!("  -h, --help: Prints the help message");
 }

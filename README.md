@@ -27,6 +27,7 @@ By running the following command, you can run a very very unsophisticated benchm
          - NMOS: The NMOS 6502 CPU
          - CMOS: The CMOS 65C02 CPU
          - NES: The NES CPU (Ricoh 2A03)
+       -s, --speed: The speed of the CPU in MHz (default: 0.000100 (100 Hz))
        -b, --benchmark: Runs demos/blink.bin for 200,000,000 cycles and prints the results
        -h, --help: Prints the help message
 

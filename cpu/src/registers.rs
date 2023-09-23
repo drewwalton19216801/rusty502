@@ -43,6 +43,14 @@ pub mod registers {
         pub fn get_flag(&self, flag: Flag) -> bool {
             (self.flags & (flag as u8)) > 0
         }
+
+        pub fn increment_sp(&mut self) {
+            self.sp = self.sp.wrapping_add(1);
+        }
+
+        pub fn decrement_sp(&mut self) {
+            self.sp = self.sp.wrapping_sub(1);
+        }
     }
 
     #[cfg(test)]

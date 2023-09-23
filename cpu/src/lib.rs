@@ -143,7 +143,7 @@ pub mod cpu {
         pub fn push(&mut self, data: u8) {
             // Push data to the stack
             self.write(0x0100 + self.registers.sp as u16, data);
-            self.registers.sp -= 1;
+            self.registers.decrement_sp();
         }
 
         pub fn push_word(&mut self, data: u16) {
@@ -154,7 +154,7 @@ pub mod cpu {
 
         pub fn pop(&mut self) -> u8 {
             // Pop data from the stack
-            self.registers.sp += 1;
+            self.registers.increment_sp();
             return self.read(0x0100 + self.registers.sp as u16);
         }
 

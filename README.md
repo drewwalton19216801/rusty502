@@ -31,5 +31,6 @@ By running the following command, you can run a very very unsophisticated benchm
        -h, --help: Prints the help message
 
 ## Helpful Links
-#### [NesDev CPU wiki](https://www.nesdev.org/wiki/CPU) - Fantastic resource for 6502 information, specifically the NES version of the 6502.
-#### [mass:werk 6502 tools](https://www.masswerk.at/6502/) - A fully functional 6502 CPU emulator, assembler, and disassembler, as well as a great resource for 6502 instruction set internals
+[NesDev CPU wiki](https://www.nesdev.org/wiki/CPU) - Fantastic resource for 6502 information, specifically the NES version of the 6502.
+
+[mass:werk 6502 tools](https://www.masswerk.at/6502/) - A fully functional 6502 CPU emulator, assembler, and disassembler, as well as a great resource for 6502 instruction set internals

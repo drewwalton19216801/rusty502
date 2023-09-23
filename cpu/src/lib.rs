@@ -1,25 +1,32 @@
-mod registers;
-mod bus;
 mod addresses;
+mod bus;
 mod instructions;
+mod registers;
 
 pub mod cpu {
-    use crate::{registers::{registers::Registers, self}, bus::bus::Bus, instructions::{self, instructions::{AddressingMode, execute_instruction}}};
     use crate::addresses::addresses;
+    use crate::{
+        bus::bus::Bus,
+        instructions::{
+            self,
+            instructions::{execute_instruction, AddressingMode},
+        },
+        registers::{self, registers::Registers},
+    };
 
     pub struct Cpu {
-        pub variant: Variant, // CPU variant
-        pub state: State, // CPU state
+        pub variant: Variant,     // CPU variant
+        pub state: State,         // CPU state
         pub registers: Registers, // Registers
-        pub bus: Bus, // Main bus
+        pub bus: Bus,             // Main bus
 
-        pub cycles: u8, // Number of cycles remaining for current instruction
-        pub temp: u16, // Temporary storage for various operations
+        pub cycles: u8,    // Number of cycles remaining for current instruction
+        pub temp: u16,     // Temporary storage for various operations
         pub addr_abs: u16, // Absolute address
         pub addr_rel: u16, // Relative address
         pub addr_mode: AddressingMode, // Addressing mode
-        pub opcode: u8, // Current opcode
-        pub fetched: u8, // Fetched data
+        pub opcode: u8,    // Current opcode
+        pub fetched: u8,   // Fetched data
 
         pub enable_illegal_opcodes: bool, // Enable illegal opcodes
     }
@@ -28,14 +35,14 @@ pub mod cpu {
     pub enum Variant {
         NMOS, // Original 6502 (with ROR bug)
         CMOS, // Modified 65C02 (no ROR bug)
-        NES, // Modified 2A03 (no decimal mode)
+        NES,  // Modified 2A03 (no decimal mode)
     }
 
     pub enum State {
-        Stopped, // CPU is stopped
-        Fetching, // CPU is fetching an instruction
-        Executing, // CPU is executing an instruction
-        Interrupt, // CPU is handling an interrupt
+        Stopped,       // CPU is stopped
+        Fetching,      // CPU is fetching an instruction
+        Executing,     // CPU is executing an instruction
+        Interrupt,     // CPU is handling an interrupt
         IllegalOpcode, // CPU encountered an illegal opcode
     }
 
@@ -107,10 +114,11 @@ pub mod cpu {
         pub fn fetch(&mut self) -> u8 {
             // Set state to Fetching
             self.state = State::Fetching;
-            // Fetch the next byte from memory
-            let data = self.read(self.registers.pc);
-            self.registers.pc += 1;
-            return data;
+            // If the current mode is implied, return 0
+            if self.addr_mode == AddressingMode::Implied {
+                self.fetched = self.read(self.addr_abs)
+            }
+            return self.fetched;
         }
 
         pub fn push(&mut self, data: u8) {
@@ -143,7 +151,8 @@ pub mod cpu {
             if self.cycles == 0 {
                 // Set state to fetching
                 self.state = State::Fetching;
-                self.opcode = self.fetch();
+                self.opcode = self.read(self.registers.pc);
+                self.registers.pc += 1;
 
                 // Get the number of cycles for this opcode
                 self.cycles = self.get_cycles(self.opcode);
@@ -155,7 +164,7 @@ pub mod cpu {
                 self.state = State::Executing;
 
                 // Execute the addressing mode function, getting the number of extra cycles required
-                let cycles_addr = self.addr_mode(addr_mode);
+                let cycles_addr = self.execute_addr_mode(addr_mode);
 
                 // Execute the instruction, getting the number of cycles required
                 let cycles_insn = execute_instruction(self.opcode, self);
@@ -168,7 +177,7 @@ pub mod cpu {
             self.cycles -= 1;
         }
 
-        pub fn addr_mode(&mut self, mode: AddressingMode) -> u8 {
+        pub fn execute_addr_mode(&mut self, mode: AddressingMode) -> u8 {
             // Set the addressing mode
             self.addr_mode = mode;
 
@@ -195,18 +204,27 @@ pub mod cpu {
 
         pub fn irq(&mut self) {
             // If interrupts are enabled, push the program counter and flags to the stack
-            if self.registers.get_flag(registers::registers::Flag::InterruptDisable) == false {
+            if self
+                .registers
+                .get_flag(registers::registers::Flag::InterruptDisable)
+                == false
+            {
                 self.push_word(self.registers.pc);
 
                 // Set the break flag to 0
-                self.registers.set_flag(registers::registers::Flag::Break, false);
+                self.registers
+                    .set_flag(registers::registers::Flag::Break, false);
 
                 // Push the status flags to the stack
-                self.registers.set_flag(registers::registers::Flag::Unused, true);
-                self.registers.set_flag(registers::registers::Flag::Break, true);
-                self.registers.set_flag(registers::registers::Flag::InterruptDisable, true);
+                self.registers
+                    .set_flag(registers::registers::Flag::Unused, true);
+                self.registers
+                    .set_flag(registers::registers::Flag::Break, true);
+                self.registers
+                    .set_flag(registers::registers::Flag::InterruptDisable, true);
                 self.push(self.registers.flags);
-                self.registers.set_flag(registers::registers::Flag::InterruptDisable, false);
+                self.registers
+                    .set_flag(registers::registers::Flag::InterruptDisable, false);
 
                 // Set the program counter to the interrupt vector
                 self.registers.pc = self.read_word(addresses::IRQ_VECTOR);
@@ -224,14 +242,19 @@ pub mod cpu {
             self.push_word(self.registers.pc);
 
             // Set the break flag to 0
-            self.registers.set_flag(registers::registers::Flag::Break, false);
+            self.registers
+                .set_flag(registers::registers::Flag::Break, false);
 
             // Push the status flags to the stack
-            self.registers.set_flag(registers::registers::Flag::Unused, true);
-            self.registers.set_flag(registers::registers::Flag::Break, true);
-            self.registers.set_flag(registers::registers::Flag::InterruptDisable, true);
+            self.registers
+                .set_flag(registers::registers::Flag::Unused, true);
+            self.registers
+                .set_flag(registers::registers::Flag::Break, true);
+            self.registers
+                .set_flag(registers::registers::Flag::InterruptDisable, true);
             self.push(self.registers.flags);
-            self.registers.set_flag(registers::registers::Flag::InterruptDisable, false);
+            self.registers
+                .set_flag(registers::registers::Flag::InterruptDisable, false);
 
             // Set the program counter to the NMI vector
             self.registers.pc = self.read_word(addresses::NMI_VECTOR);
@@ -265,12 +288,14 @@ pub mod cpu {
             return 0;
         }
         pub fn addr_zero_page_x(&mut self) -> u8 {
-            self.addr_abs = ((self.read(self.registers.pc) as u16) + self.registers.x as u16) & 0x00FF;
+            self.addr_abs =
+                ((self.read(self.registers.pc) as u16) + self.registers.x as u16) & 0x00FF;
             self.registers.pc += 1;
             return 0;
         }
         pub fn addr_zero_page_y(&mut self) -> u8 {
-            self.addr_abs = ((self.read(self.registers.pc) as u16) + self.registers.y as u16) & 0x00FF;
+            self.addr_abs =
+                ((self.read(self.registers.pc) as u16) + self.registers.y as u16) & 0x00FF;
             self.registers.pc += 1;
             return 0;
         }
@@ -388,19 +413,22 @@ pub mod cpu {
             self.registers.pc += 1;
 
             // Set the interrupt disable flag to 1
-            self.registers.set_flag(registers::registers::Flag::InterruptDisable, true);
+            self.registers
+                .set_flag(registers::registers::Flag::InterruptDisable, true);
 
             // Push the PC to the stack
             self.push_word(self.registers.pc);
 
             // Set the break flag
-            self.registers.set_flag(registers::registers::Flag::Break, true);
+            self.registers
+                .set_flag(registers::registers::Flag::Break, true);
 
             // Push the flags to the stack
             self.push(self.registers.flags);
 
             // Clear the break flag
-            self.registers.set_flag(registers::registers::Flag::Break, false);
+            self.registers
+                .set_flag(registers::registers::Flag::Break, false);
 
             // Set the PC to the data at the interrupt vector
             self.registers.pc = self.read_word(addresses::IRQ_VECTOR);
@@ -474,8 +502,12 @@ pub mod cpu {
             self.registers.a = self.fetched;
 
             // Set the Zero and Negative flags
-            self.registers.set_flag(registers::registers::Flag::Zero, self.registers.a == 0x00);
-            self.registers.set_flag(registers::registers::Flag::Negative, (self.registers.a & 0x80) > 0);
+            self.registers
+                .set_flag(registers::registers::Flag::Zero, self.registers.a == 0x00);
+            self.registers.set_flag(
+                registers::registers::Flag::Negative,
+                (self.registers.a & 0x80) > 0,
+            );
 
             // Return the number of cycles required
             return 1;
@@ -542,10 +574,12 @@ pub mod cpu {
             self.temp &= 0xFF;
 
             // Set the negative flag if the 8th bit of the temp variable is 1
-            self.registers.set_flag(registers::registers::Flag::Negative, (self.temp & 0x80) > 0);
+            self.registers
+                .set_flag(registers::registers::Flag::Negative, (self.temp & 0x80) > 0);
 
             // Set the zero flag if the temp variable is 0
-            self.registers.set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
+            self.registers
+                .set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
 
             // If the addressing mode is immediate, store the temp variable in the accumulator
             if self.addr_mode == AddressingMode::Immediate {
@@ -568,7 +602,8 @@ pub mod cpu {
             }
 
             // Set the carry flag if the 9th bit of the temp variable is 1
-            self.registers.set_flag(registers::registers::Flag::Carry, (self.temp & 0x01) > 0);
+            self.registers
+                .set_flag(registers::registers::Flag::Carry, (self.temp & 0x01) > 0);
 
             // Shift the temp variable right by 1 bit
             self.temp >>= 1;
@@ -577,10 +612,12 @@ pub mod cpu {
             self.temp &= 0xFF;
 
             // Set the negative flag if the 8th bit of the temp variable is 1
-            self.registers.set_flag(registers::registers::Flag::Negative, (self.temp & 0x80) > 0);
+            self.registers
+                .set_flag(registers::registers::Flag::Negative, (self.temp & 0x80) > 0);
 
             // Set the zero flag if the temp variable is 0
-            self.registers.set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
+            self.registers
+                .set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
 
             // Store the temp variable in the accumulator
             self.registers.a = self.temp as u8;
@@ -602,10 +639,12 @@ pub mod cpu {
             self.temp &= 0xFF;
 
             // Set the carry flag if the 8th bit of the temp variable is 1
-            self.registers.set_flag(registers::registers::Flag::Carry, (self.temp & 0x80) > 0);
+            self.registers
+                .set_flag(registers::registers::Flag::Carry, (self.temp & 0x80) > 0);
 
             // Set the negative flag if the temp variable is 0
-            self.registers.set_flag(registers::registers::Flag::Negative, self.temp == 0x00);
+            self.registers
+                .set_flag(registers::registers::Flag::Negative, self.temp == 0x00);
 
             // Store the temp variable in memory
             self.write(self.addr_abs, self.temp as u8);
@@ -616,14 +655,15 @@ pub mod cpu {
         fn ror_cmos(&mut self) -> u8 {
             // Load the next byte from memory into the temporary variable
             self.temp = self.fetch() as u16;
-            
+
             // If the carry flag is set, set the 9th bit of the temp variable
             if self.registers.get_flag(registers::registers::Flag::Carry) {
                 self.temp |= 0x100;
             }
 
             // Set the carry flag if the 9th bit of the temp variable is 1
-            self.registers.set_flag(registers::registers::Flag::Carry, (self.temp & 0x01) > 0);
+            self.registers
+                .set_flag(registers::registers::Flag::Carry, (self.temp & 0x01) > 0);
 
             // Shift the temp variable right by 1 bit
             self.temp >>= 1;
@@ -632,10 +672,12 @@ pub mod cpu {
             self.temp &= 0xFF;
 
             // Set the negative flag if the temp variable is 0
-            self.registers.set_flag(registers::registers::Flag::Negative, self.temp == 0x00);
+            self.registers
+                .set_flag(registers::registers::Flag::Negative, self.temp == 0x00);
 
             // Set the zero flag if the temp variable is 0
-            self.registers.set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
+            self.registers
+                .set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
 
             // Store the temp variable in memory
             self.write(self.addr_abs, self.temp as u8);

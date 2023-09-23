@@ -2,7 +2,8 @@ pub mod bus {
     use std::{cell::RefCell, rc::Rc};
 
     pub struct Bus {
-        pub ram: [u8; 64 * 1024], // 64 KB of RAM
+        // Store 64K of RAM on the heap
+        pub ram: Box<[u8; 64 * 1024]>,
 
         pub read_hooks: Vec<Option<Rc<RefCell<dyn FnMut(u16) -> u8>>>>,
         pub write_hooks: Vec<Option<Rc<RefCell<dyn FnMut(u16, u8)>>>>,
@@ -11,8 +12,7 @@ pub mod bus {
     impl Bus {
         pub fn new() -> Self {
             Self {
-                ram: [0; 64 * 1024],
-
+                ram: Box::new([0; 64 * 1024]),
                 read_hooks: vec![None; 64 * 1024],
                 write_hooks: vec![None; 64 * 1024],
             }
@@ -54,6 +54,58 @@ pub mod bus {
                 let mut hook = hook.borrow_mut();
                 hook(address, data);
             }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_load_rom_at() {
+            let mut bus = Bus::new();
+            let rom = [0x01, 0x02, 0x03];
+            bus.load_rom_at(&rom, 0x8000);
+            assert_eq!(bus.read(0x8000), 0x01);
+            assert_eq!(bus.read(0x8001), 0x02);
+            assert_eq!(bus.read(0x8002), 0x03);
+        }
+
+        #[test]
+        fn test_add_read_hook() {
+            let mut bus = Bus::new();
+            let hook = Rc::new(RefCell::new(|address| {
+                if address == 0x1234 {
+                    return 0x42;
+                } else {
+                    return 0x00;
+                }
+            }));
+            bus.add_read_hook(0x1234, hook.clone());
+            assert_eq!(bus.read(0x1234), 0x42);
+            assert_eq!(bus.read(0x5678), 0x00);
+        }
+
+        #[test]
+        fn test_add_write_hook() {
+            let mut bus = Bus::new();
+            let hook = Rc::new(RefCell::new(|address, data| {
+                if address == 0x1234 {
+                    assert_eq!(data, 0x42);
+                } else {
+                    assert_eq!(data, 0x00);
+                }
+            }));
+            bus.add_write_hook(0x1234, hook.clone());
+            bus.write(0x1234, 0x42);
+            bus.write(0x5678, 0x00);
+        }
+
+        #[test]
+        fn test_read_write() {
+            let mut bus = Bus::new();
+            bus.write(0x1234, 0x42);
+            assert_eq!(bus.read(0x1234), 0x42);
         }
     }
 }

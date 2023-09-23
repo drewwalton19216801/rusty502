@@ -20,7 +20,7 @@ pub mod cpu {
         pub opcode: u8, // Current opcode
         pub fetched: u8, // Fetched data
 
-        pub enableIllegalOpcodes: bool, // Enable illegal opcodes
+        pub enable_illegal_opcodes: bool, // Enable illegal opcodes
     }
 
     pub enum Variant {
@@ -52,7 +52,7 @@ pub mod cpu {
                 opcode: 0,
                 fetched: 0,
 
-                enableIllegalOpcodes: false,
+                enable_illegal_opcodes: false,
             }
         }
 
@@ -61,7 +61,7 @@ pub mod cpu {
         }
 
         pub fn set_illegal_opcodes(&mut self, enable: bool) {
-            self.enableIllegalOpcodes = enable;
+            self.enable_illegal_opcodes = enable;
         }
 
         pub fn reset(&mut self) {

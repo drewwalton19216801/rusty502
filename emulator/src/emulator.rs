@@ -1,5 +1,4 @@
 pub mod emulator {
-    use core::num;
     use std::{cell::RefCell, rc::Rc};
 
     use cpu::{self, cpu::Cpu};

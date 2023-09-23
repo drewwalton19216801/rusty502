@@ -1,0 +1,1 @@
+/home/drew/Projects/rusty502/target/debug/emulator: /home/drew/Projects/rusty502/cpu/src/addresses.rs /home/drew/Projects/rusty502/cpu/src/bus.rs /home/drew/Projects/rusty502/cpu/src/instructions.rs /home/drew/Projects/rusty502/cpu/src/lib.rs /home/drew/Projects/rusty502/cpu/src/registers.rs /home/drew/Projects/rusty502/emulator/src/main.rs

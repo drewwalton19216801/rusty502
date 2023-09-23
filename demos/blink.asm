@@ -12,9 +12,6 @@ loop:
   sta $6000
 
   jmp loop
-  
-die:
-  brk
 
   .org $fffc
   .word reset

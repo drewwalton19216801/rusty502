@@ -18,6 +18,12 @@ pub mod bus {
             }
         }
 
+        pub fn load_rom_at(&mut self, rom: &[u8], address: u16) {
+            for (i, &byte) in rom.iter().enumerate() {
+                self.ram[address as usize + i] = byte;
+            }
+        }
+
         pub fn add_read_hook(&mut self, address: u16, hook: Rc<RefCell<dyn FnMut(u16) -> u8>>) {
             self.read_hooks[address as usize] = Some(hook);
         }

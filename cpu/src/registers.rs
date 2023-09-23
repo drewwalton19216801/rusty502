@@ -46,8 +46,8 @@ pub mod registers {
 
         pub fn dump_registers(&self) {
             // Dump registers to stdout, using NVUBDIZC format for flags
-            println!("A: {:02X} X: {:02X} Y: {:02X} P: {:02X} SP: {:02X}",
-                     self.a, self.x, self.y, self.flags, self.sp);
+            println!("A: {:02X} X: {:02X} Y: {:02X} P: {:02X} SP: {:02X} PC: {:04X}",
+                     self.a, self.x, self.y, self.flags, self.sp, self.pc);
             
             let mut flag_string = String::new();
             flag_string.push_str(if self.get_flag(Flag::Negative) { "N" } else { "n" });

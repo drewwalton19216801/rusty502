@@ -59,6 +59,10 @@ pub mod cpu {
             }
         }
 
+        pub fn dump_cycles(&self) {
+            println!("Cycles remaining: {}", self.cycles);
+        }
+
         pub fn change_variant(&mut self, variant: Variant) {
             self.variant = variant;
         }
@@ -76,6 +80,7 @@ pub mod cpu {
             self.registers.sp = 0xFD;
             // Set all flags to 0x00, except for the unused flag and the interrupt disable flag
             self.registers.flags = 0x24;
+            self.cycles = 8;
         }
 
         pub fn read(&self, address: u16) -> u8 {
@@ -156,7 +161,7 @@ pub mod cpu {
                 let cycles_insn = execute_instruction(self.opcode, self);
 
                 // Add the number of cycles required by the addressing mode and the instruction
-                self.cycles = cycles_addr + cycles_insn;
+                self.cycles += cycles_addr + cycles_insn;
             }
 
             // Decrement the number of cycles remaining

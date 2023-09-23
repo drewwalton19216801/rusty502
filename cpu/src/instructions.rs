@@ -1,7 +1,7 @@
 pub mod instructions {
     use crate::cpu::Cpu;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Copy, Clone)]
     pub enum AddressingMode {
         Absolute,
         AbsoluteX,
@@ -284,6 +284,19 @@ pub mod instructions {
         Instruction { opcode: 0xFE, name: "INC", mode: AddressingMode::AbsoluteX, cycles: 7, function: crate::cpu::Cpu::inc },
         Instruction { opcode: 0xFF, name: "ISC", mode: AddressingMode::AbsoluteX, cycles: 7, function: crate::cpu::Cpu::isc },
     ];
+
+    pub fn get_cycles(opcode: u8) -> u8 {
+        INSTRUCTION_LIST[opcode as usize].cycles
+    }
+
+    pub fn get_addr_mode(opcode: u8) -> AddressingMode {
+        INSTRUCTION_LIST[opcode as usize].mode
+    }
+
+    pub fn execute_instruction(opcode: u8, cpu: &mut Cpu) -> u8 {
+        let instruction = &INSTRUCTION_LIST[opcode as usize];
+        (instruction.function)(cpu)
+    }
 
     pub fn print_instruction_list() {
         println!("OPCODE\tNAME\tMODE\tCYCLES");

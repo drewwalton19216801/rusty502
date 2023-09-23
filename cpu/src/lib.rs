@@ -4,7 +4,7 @@ mod addresses;
 mod instructions;
 
 pub mod cpu {
-    use crate::{registers::{registers::Registers, self}, bus::bus::Bus, instructions};
+    use crate::{registers::{registers::Registers, self}, bus::bus::Bus, instructions::{self, instructions::{AddressingMode, execute_instruction}}};
     use crate::addresses::addresses;
 
     pub struct Cpu {
@@ -133,17 +133,53 @@ pub mod cpu {
         pub fn clock(&mut self) {
             // If we have no cycles remaining, fetch the next opcode
             if self.cycles == 0 {
+                // Set state to fetching
+                self.state = State::Fetching;
                 self.opcode = self.fetch();
 
                 // Get the number of cycles for this opcode
-                //self.cycles = self.get_cycles(self.opcode);
+                self.cycles = self.get_cycles(self.opcode);
 
-                // Execute the opcode
-                //self.execute_opcode(self.opcode);
+                // Get the addressing mode for this opcode
+                let addr_mode = instructions::instructions::get_addr_mode(self.opcode);
+
+                // We are now in the executing state
+                self.state = State::Executing;
+
+                // Execute the addressing mode function, getting the number of extra cycles required
+                let cycles_addr = self.addr_mode(addr_mode);
+
+                // Execute the instruction, getting the number of cycles required
+                let cycles_insn = execute_instruction(self.opcode, self);
+
+                // Add the number of cycles required by the addressing mode and the instruction
+                self.cycles = cycles_addr + cycles_insn;
             }
 
             // Decrement the number of cycles remaining
             self.cycles -= 1;
+        }
+
+        pub fn addr_mode(&mut self, mode: AddressingMode) -> u8 {
+            // Execute the addressing mode
+            match mode {
+                AddressingMode::Implied => return self.addr_implied(),
+                AddressingMode::Immediate => return self.addr_immediate(),
+                AddressingMode::ZeroPage => return self.addr_zero_page(),
+                AddressingMode::ZeroPageX => return self.addr_zero_page_x(),
+                AddressingMode::ZeroPageY => return self.addr_zero_page_y(),
+                AddressingMode::Relative => return self.addr_relative(),
+                AddressingMode::Absolute => return self.addr_absolute(),
+                AddressingMode::AbsoluteX => return self.addr_absolute_x(),
+                AddressingMode::AbsoluteY => return self.addr_absolute_y(),
+                AddressingMode::Indirect => return self.addr_indirect(),
+                AddressingMode::IndexedIndirect => return self.addr_indexed_indirect(),
+                AddressingMode::IndirectIndexed => return self.addr_indirect_indexed(),
+            }
+        }
+
+        pub fn get_cycles(&self, opcode: u8) -> u8 {
+            return instructions::instructions::get_cycles(opcode);
         }
 
         pub fn irq(&mut self) {
@@ -201,9 +237,111 @@ pub mod cpu {
         }
 
         /**
+         * Addressing modes (https://wiki.nesdev.com/w/index.php/CPU_addressing_modes)
+         */
+        pub fn addr_implied(&mut self) -> u8 {
+            self.fetched = self.registers.a;
+            return 0;
+        }
+        pub fn addr_immediate(&mut self) -> u8 {
+            self.addr_abs = self.registers.pc;
+            self.registers.pc += 1;
+            return 0;
+        }
+        pub fn addr_zero_page(&mut self) -> u8 {
+            self.addr_abs = (self.read(self.registers.pc) as u16) & 0x00FF;
+            self.registers.pc += 1;
+            return 0;
+        }
+        pub fn addr_zero_page_x(&mut self) -> u8 {
+            self.addr_abs = ((self.read(self.registers.pc) as u16) + self.registers.x as u16) & 0x00FF;
+            self.registers.pc += 1;
+            return 0;
+        }
+        pub fn addr_zero_page_y(&mut self) -> u8 {
+            self.addr_abs = ((self.read(self.registers.pc) as u16) + self.registers.y as u16) & 0x00FF;
+            self.registers.pc += 1;
+            return 0;
+        }
+        pub fn addr_relative(&mut self) -> u8 {
+            self.addr_rel = self.read(self.registers.pc) as u16;
+            self.registers.pc += 1;
+            if self.addr_rel & 0x80 != 0 {
+                self.addr_rel |= 0xFF00;
+            }
+            return 0;
+        }
+        pub fn addr_absolute(&mut self) -> u8 {
+            let lo = self.read(self.registers.pc) as u16;
+            let hi = self.read(self.registers.pc + 1) as u16;
+            self.addr_abs = (hi << 8) | lo;
+            self.registers.pc += 2;
+            return 0;
+        }
+        pub fn addr_absolute_x(&mut self) -> u8 {
+            let lo = self.read(self.registers.pc) as u16;
+            let hi = self.read(self.registers.pc + 1) as u16;
+            self.addr_abs = ((hi << 8) | lo) + self.registers.x as u16;
+            self.registers.pc += 2;
+
+            // Check if the page changed, and if so, add an extra cycle
+            if (self.addr_abs & 0xFF00) != (hi << 8) {
+                return 1;
+            }
+            return 0;
+        }
+        pub fn addr_absolute_y(&mut self) -> u8 {
+            let lo = self.read(self.registers.pc) as u16;
+            let hi = self.read(self.registers.pc + 1) as u16;
+            self.addr_abs = ((hi << 8) | lo) + self.registers.y as u16;
+            self.registers.pc += 2;
+
+            // Check if the page changed, and if so, add an extra cycle
+            if (self.addr_abs & 0xFF00) != (hi << 8) {
+                return 1;
+            }
+            return 0;
+        }
+        pub fn addr_indirect(&mut self) -> u8 {
+            let ptr_lo = self.read(self.registers.pc) as u16;
+            let ptr_hi = self.read(self.registers.pc + 1) as u16;
+            let ptr = (ptr_hi << 8) | ptr_lo;
+
+            // Check for page boundary crossing
+            if ptr_lo == 0x00FF {
+                // Simulate page boundary hardware bug
+                self.addr_abs = (self.read(ptr & 0xFF00) as u16) << 8 | self.read(ptr + 0) as u16;
+            } else {
+                self.addr_abs = (self.read(ptr + 1) as u16) << 8 | self.read(ptr + 0) as u16;
+            }
+            self.registers.pc += 2;
+            return 0;
+        }
+        pub fn addr_indexed_indirect(&mut self) -> u8 {
+            let t = self.read(self.registers.pc) as u16;
+            let lo = self.read((t + self.registers.x as u16) & 0x00FF) as u16;
+            let hi = self.read((t + self.registers.x as u16 + 1) & 0x00FF) as u16;
+            self.addr_abs = (hi << 8) | lo;
+            self.registers.pc += 1;
+            return 0;
+        }
+        pub fn addr_indirect_indexed(&mut self) -> u8 {
+            let t = self.read(self.registers.pc) as u16;
+            let lo = self.read(t & 0x00FF) as u16;
+            let hi = self.read((t + 1) & 0x00FF) as u16;
+            self.addr_abs = ((hi << 8) | lo) + self.registers.y as u16;
+            self.registers.pc += 1;
+
+            // Check if the page changed, and if so, add an extra cycle
+            if (self.addr_abs & 0xFF00) != (hi << 8) {
+                return 1;
+            }
+            return 0;
+        }
+
+        /**
          * CPU instructions
          */
-
         pub fn adc(&mut self) -> u8 {
             return 0;
         }

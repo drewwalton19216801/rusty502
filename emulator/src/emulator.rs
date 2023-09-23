@@ -17,12 +17,17 @@ pub mod emulator {
             }
         }
 
-        pub fn load_file_from_path(&mut self, path: &str) {
-            // Load the file into a vector
+        pub fn load_rom_from_path(&mut self, path: &str, address: u16) {
+            // Load the rom file into a vector
             let rom = std::fs::read(path).unwrap();
 
-            // Load the file into memory
-            self.cpu.bus.load_rom_at(&rom, 0xC000);
+            // Load the rom file into memory
+            self.cpu.bus.load_rom_at(&rom, address);
+        }
+
+        pub fn change_variant(&mut self, variant: String) {
+            // Change the variant of the CPU
+            self.cpu.change_variant(cpu::cpu::Variant::from_string(variant));
         }
 
         pub fn run(&mut self) {

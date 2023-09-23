@@ -38,6 +38,25 @@ pub mod cpu {
         NES,  // Modified 2A03 (no decimal mode)
     }
 
+    impl Variant {
+        pub fn from_string(variant: String) -> Self {
+            match variant.as_str() {
+                "NMOS" => return Self::NMOS,
+                "CMOS" => return Self::CMOS,
+                "NES" => return Self::NES,
+                _ => panic!("Invalid CPU variant"),
+            }
+        }
+
+        pub fn to_string(&self) -> String {
+            match self {
+                Self::NMOS => return String::from("NMOS"),
+                Self::CMOS => return String::from("CMOS"),
+                Self::NES => return String::from("NES"),
+            }
+        }
+    }
+
     pub enum State {
         Stopped,       // CPU is stopped
         Fetching,      // CPU is fetching an instruction

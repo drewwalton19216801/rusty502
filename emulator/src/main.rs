@@ -13,16 +13,23 @@ mod emulator;
  *     - NMOS: The CMOS 6502 CPU
  *     - CMOS: The NMOS 65C02 CPU (default)
  *     - NES: The NES CPU (Ricoh 2A03)
+ *  -b, --benchmark: Runs demos/blink.bin for 1000000 cycles and prints the results"
  *  -h, --help: Prints the help message
  */
 
 fn main() {
     // Parse the command line arguments
     let args: Vec<String> = env::args().collect();
-    let (rom_path, address, variant) = parse_args(args);
+    let (rom_path, address, variant, benchmark_mode) = parse_args(args);
 
     // Create the emulator
     let mut emulator = emulator::emulator::Emulator::new();
+
+    // If benchmark mode is enabled, run the benchmark
+    if benchmark_mode {
+        emulator.benchmark();
+        std::process::exit(0);
+    }
 
     // Load the ROM file
     emulator.load_rom_from_path(&rom_path, address);
@@ -40,11 +47,12 @@ fn main() {
     */
 }
 
-fn parse_args(args: Vec<String>) -> (String, u16, String) {
+fn parse_args(args: Vec<String>) -> (String, u16, String, bool) {
     // Set the default values
     let mut rom_path = String::from("demos/blink.bin");
-    let mut address = 0x8000;
+    let mut address = 0xC000;
     let mut variant = String::from("CMOS");
+    let mut benchmark_mode = false;
 
     // Parse the arguments
     let mut i = 1;
@@ -62,6 +70,9 @@ fn parse_args(args: Vec<String>) -> (String, u16, String) {
                 variant = args[i + 1].clone();
                 i += 1;
             }
+            "-b" | "--benchmark" => {
+                benchmark_mode = true;
+            }
             "-h" | "--help" => {
                 print_help();
                 std::process::exit(0);
@@ -76,7 +87,7 @@ fn parse_args(args: Vec<String>) -> (String, u16, String) {
     }
 
     // Return the parsed arguments
-    (rom_path, address, variant)
+    (rom_path, address, variant, benchmark_mode)
 }
 
 fn print_help() {
@@ -88,5 +99,6 @@ fn print_help() {
     println!("     - NMOS: The CMOS 6502 CPU");
     println!("     - CMOS: The NMOS 65C02 CPU (default)");
     println!("     - NES: The NES CPU (Ricoh 2A03)");
+    println!("  -b, --benchmark: Runs demos/blink.bin for 200,000,000 cycles and prints the results");
     println!("  -h, --help: Prints the help message");
 }

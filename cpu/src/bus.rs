@@ -1,12 +1,12 @@
 pub mod bus {
-    use std::{cell::RefCell, rc::Rc};
+    use std::{cell::RefCell, sync::Arc};
 
     pub struct Bus {
         // Store 64K of RAM on the heap
         pub ram: Box<[u8; 64 * 1024]>,
 
-        pub read_hooks: Vec<Option<Rc<RefCell<dyn FnMut(u16) -> u8>>>>,
-        pub write_hooks: Vec<Option<Rc<RefCell<dyn FnMut(u16, u8)>>>>,
+        pub read_hooks: Vec<Option<Arc<RefCell<dyn FnMut(u16) -> u8>>>>,
+        pub write_hooks: Vec<Option<Arc<RefCell<dyn FnMut(u16, u8)>>>>,
     }
 
     impl Bus {
@@ -24,11 +24,11 @@ pub mod bus {
             }
         }
 
-        pub fn add_read_hook(&mut self, address: u16, hook: Rc<RefCell<dyn FnMut(u16) -> u8>>) {
+        pub fn add_read_hook(&mut self, address: u16, hook: Arc<RefCell<dyn FnMut(u16) -> u8>>) {
             self.read_hooks[address as usize] = Some(hook);
         }
 
-        pub fn add_write_hook(&mut self, address: u16, hook: Rc<RefCell<dyn FnMut(u16, u8)>>) {
+        pub fn add_write_hook(&mut self, address: u16, hook: Arc<RefCell<dyn FnMut(u16, u8)>>) {
             self.write_hooks[address as usize] = Some(hook);
         }
 
@@ -74,7 +74,7 @@ pub mod bus {
         #[test]
         fn test_add_read_hook() {
             let mut bus = Bus::new();
-            let hook = Rc::new(RefCell::new(|address| {
+            let hook = Arc::new(RefCell::new(|address| {
                 if address == 0x1234 {
                     return 0x42;
                 } else {
@@ -89,7 +89,7 @@ pub mod bus {
         #[test]
         fn test_add_write_hook() {
             let mut bus = Bus::new();
-            let hook = Rc::new(RefCell::new(|address, data| {
+            let hook = Arc::new(RefCell::new(|address, data| {
                 if address == 0x1234 {
                     assert_eq!(data, 0x42);
                 } else {

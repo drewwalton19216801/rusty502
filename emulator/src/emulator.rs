@@ -1,5 +1,6 @@
 pub mod emulator {
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::Arc;
+    use std::cell::RefCell;
 
     use cpu::{self, cpu::Cpu};
 
@@ -33,10 +34,10 @@ pub mod emulator {
             // Register our test write hook
             self.cpu
                 .bus
-                .add_write_hook(0x6000, Rc::new(RefCell::new(Self::blink_led)));
+                .add_write_hook(0x6000, Arc::new(RefCell::new(Self::blink_led)));
             self.cpu
                 .bus
-                .add_write_hook(0x6002, Rc::new(RefCell::new(Self::blink_led)));
+                .add_write_hook(0x6002, Arc::new(RefCell::new(Self::blink_led)));
 
             // Change the variant to CMOS
             self.cpu.change_variant(cpu::cpu::Variant::CMOS);

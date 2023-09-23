@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 cpu = { path = "../cpu" }
 argparse = "0.2.2"
+raylib = { version = "3.7" }

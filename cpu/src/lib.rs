@@ -115,7 +115,7 @@ pub mod cpu {
             // Set state to Fetching
             self.state = State::Fetching;
             // If the current mode is implied, return 0
-            if self.addr_mode == AddressingMode::Implied {
+            if self.addr_mode != AddressingMode::Implied {
                 self.fetched = self.read(self.addr_abs)
             }
             return self.fetched;

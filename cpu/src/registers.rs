@@ -1,5 +1,6 @@
 pub mod registers {
 
+    #[derive(Clone)]
     pub struct Registers {
         pub a: u8,     // Accumulator
         pub x: u8,     // X register

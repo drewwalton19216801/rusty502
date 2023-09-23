@@ -1,6 +1,7 @@
 pub mod emulator {
-    use std::sync::Arc;
-    use std::cell::RefCell;
+    use std::io::Write;
+    use std::sync::{Arc, Mutex};
+    use std::thread;
 
     use cpu::{self, cpu::Cpu};
 
@@ -9,11 +10,25 @@ pub mod emulator {
 
     pub struct Emulator {
         pub cpu: Cpu,
+        cpu_speed_hz: f64,
     }
 
     impl Emulator {
         pub fn new() -> Self {
-            Self { cpu: Cpu::new() }
+            Self {
+                cpu: Cpu::new(),
+                cpu_speed_hz: 0_000_000.0,
+            }
+        }
+
+        #[allow(dead_code)]
+        pub fn change_speed(&mut self, speed: f64) {
+            self.cpu_speed_hz = speed;
+        }
+
+        #[allow(dead_code)]
+        pub fn change_speed_mhz(&mut self, speed: f64) {
+            self.cpu_speed_hz = speed * 1_000_000.0;
         }
 
         pub fn load_rom_from_path(&mut self, path: &str, address: u16) {
@@ -30,24 +45,47 @@ pub mod emulator {
                 .change_variant(cpu::cpu::Variant::from_string(variant));
         }
 
-        pub fn run(&mut self) {
+        // Run the emulator for a certain number of cycles (optional)
+        pub fn run(&mut self, speed_mhz: f64, num_cycles: Option<u64>) {
+            let shared_cpu = Arc::new(Mutex::new(self.cpu.clone()));
+
+            let mut cycles_left = num_cycles.unwrap_or(u64::MAX);
+
             // Register our test write hook
-            self.cpu
+            shared_cpu
+                .lock()
+                .unwrap()
                 .bus
-                .add_write_hook(0x6000, Arc::new(RefCell::new(Self::blink_led)));
-            self.cpu
+                .add_write_hook(0x6000, Arc::new(Mutex::new(Self::blink_led)));
+            shared_cpu
+                .lock()
+                .unwrap()
                 .bus
-                .add_write_hook(0x6002, Arc::new(RefCell::new(Self::blink_led)));
+                .add_write_hook(0x6002, Arc::new(Mutex::new(Self::blink_led)));
 
             // Change the variant to CMOS
-            self.cpu.change_variant(cpu::cpu::Variant::CMOS);
+            shared_cpu
+                .lock()
+                .unwrap()
+                .change_variant(cpu::cpu::Variant::CMOS);
 
-            self.cpu.reset();
+            shared_cpu.lock().unwrap().reset();
 
-            // Run the CPU for 100 cycles
-            for _ in 0..1000 {
-                self.cpu.clock();
-            }
+            // Calculate the number of cycles to run per second
+            let cycles_per_second = speed_mhz * 1_000_000.0;
+
+            // Spawn a new thread to run the CPU
+            let cpu_thread = thread::spawn({
+                let shared_cpu = shared_cpu.clone();
+                move || while cycles_left > 0 {
+                    shared_cpu.lock().unwrap().clock();
+                    cycles_left -= 1;
+                    std::thread::sleep(std::time::Duration::from_secs_f64(1.0 / cycles_per_second));
+                }
+            });
+
+            // Wait for the CPU thread to finish
+            cpu_thread.join().unwrap();
         }
 
         pub fn benchmark(&mut self) {
@@ -57,12 +95,22 @@ pub mod emulator {
 
             let num_cycles = 200000000;
 
+            // Spawn a new thread to run the CPU
+            let cpu_thread = thread::spawn({
+                let mut shared_cpu = self.cpu.clone();
+                move || {
+                    for _ in 0..num_cycles {
+                        shared_cpu.clock();
+                    }
+                }
+            });
+
             // Start a timer
             let start = std::time::Instant::now();
-            // Run the CPU for num_cycles cycles
-            for _ in 0..num_cycles {
-                self.cpu.clock();
-            }
+
+            // Wait for the CPU thread to finish
+            cpu_thread.join().unwrap();
+
             // Stop the timer
             let end = std::time::Instant::now();
 
@@ -107,13 +155,19 @@ pub mod emulator {
                 }
             }
 
-            // Print the LED strip
-            unsafe {
-                for i in 0..8 {
-                    print!("{}", if LED_STRIP[i] { "█" } else { " " });
+            // Clear the line and print the LED strip
+            print!("{}[2K", 27 as char);
+            print!("{}[{}D", 27 as char, 8);
+            for i in 0..8 {
+                if unsafe { LED_STRIP[i] } {
+                    print!("█");
+                } else {
+                    print!("░");
                 }
-                println!();
             }
+
+            // Flush stdout
+            std::io::stdout().flush().unwrap();
         }
     }
 }

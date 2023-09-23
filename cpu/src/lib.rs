@@ -14,6 +14,7 @@ pub mod cpu {
         registers::{self, registers::Registers},
     };
 
+    #[derive(Clone)]
     pub struct Cpu {
         pub variant: Variant,     // CPU variant
         pub state: State,         // CPU state
@@ -57,6 +58,7 @@ pub mod cpu {
         }
     }
 
+    #[derive(Clone, Copy, PartialEq)]
     pub enum State {
         Stopped,       // CPU is stopped
         Fetching,      // CPU is fetching an instruction

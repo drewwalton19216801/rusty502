@@ -37,14 +37,16 @@ fn main() {
     // Change the variant of the CPU
     emulator.change_variant(variant);
 
-    // Run the emulator
-    emulator.run();
+    // Run the emulator at 10 Hz for 100 cycles
+    let speed = 10.0 / 1_000_000.0;
+    emulator.run(speed, Some(100));
     
     /*
     let mut emulator = emulator::emulator::Emulator::new();
     emulator.load_file_from_path("demos/blink.bin");
     emulator.run();
     */
+    println!();
 }
 
 fn parse_args(args: Vec<String>) -> (String, u16, String, bool) {

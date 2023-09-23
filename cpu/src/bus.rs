@@ -1,12 +1,13 @@
 pub mod bus {
-    use std::{cell::RefCell, sync::Arc};
+    use std::sync::{Arc, Mutex};
 
+    #[derive(Clone)]
     pub struct Bus {
         // Store 64K of RAM on the heap
         pub ram: Box<[u8; 64 * 1024]>,
 
-        pub read_hooks: Vec<Option<Arc<RefCell<dyn FnMut(u16) -> u8>>>>,
-        pub write_hooks: Vec<Option<Arc<RefCell<dyn FnMut(u16, u8)>>>>,
+        pub read_hooks: Vec<Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>>,
+        pub write_hooks: Vec<Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>>,
     }
 
     impl Bus {
@@ -24,11 +25,11 @@ pub mod bus {
             }
         }
 
-        pub fn add_read_hook(&mut self, address: u16, hook: Arc<RefCell<dyn FnMut(u16) -> u8>>) {
+        pub fn add_read_hook(&mut self, address: u16, hook: Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>) {
             self.read_hooks[address as usize] = Some(hook);
         }
 
-        pub fn add_write_hook(&mut self, address: u16, hook: Arc<RefCell<dyn FnMut(u16, u8)>>) {
+        pub fn add_write_hook(&mut self, address: u16, hook: Arc<Mutex<dyn FnMut(u16, u8) + Send>>) {
             self.write_hooks[address as usize] = Some(hook);
         }
 
@@ -36,22 +37,22 @@ pub mod bus {
             // Check if there is a read hook for this address,
             // and if so, call it
             if let Some(hook) = &self.read_hooks[address as usize] {
-                let mut hook = hook.borrow_mut();
+                let mut hook = hook.lock().unwrap();
                 return hook(address);
             } else {
                 // Otherwise, just read from RAM
                 return self.ram[address as usize];
             }
         }
-
+    
         pub fn write(&mut self, address: u16, data: u8) {
             // For debugging, we want to write to RAM anyway
             self.ram[address as usize] = data;
-
+    
             // Check if there is a write hook for this address,
             // and if so, call it
             if let Some(hook) = &self.write_hooks[address as usize] {
-                let mut hook = hook.borrow_mut();
+                let mut hook = hook.lock().unwrap();
                 hook(address, data);
             }
         }
@@ -74,7 +75,7 @@ pub mod bus {
         #[test]
         fn test_add_read_hook() {
             let mut bus = Bus::new();
-            let hook = Arc::new(RefCell::new(|address| {
+            let hook = Arc::new(Mutex::new(|address| {
                 if address == 0x1234 {
                     return 0x42;
                 } else {
@@ -89,7 +90,7 @@ pub mod bus {
         #[test]
         fn test_add_write_hook() {
             let mut bus = Bus::new();
-            let hook = Arc::new(RefCell::new(|address, data| {
+            let hook = Arc::new(Mutex::new(|address, data| {
                 if address == 0x1234 {
                     assert_eq!(data, 0x42);
                 } else {

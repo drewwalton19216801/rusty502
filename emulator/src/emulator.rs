@@ -38,16 +38,12 @@ pub mod emulator {
             self.cpu.reset();
 
             // Run the CPU for 100 cycles
-            for _ in 0..100 {
+            for _ in 0..1000 {
                 self.cpu.clock();
             }
         }
 
         pub fn blink_led(address: u16, data: u8) {
-            // If the address is 0x6000 or 0x6002, we want to print the data
-            if address == 0x6000 || address == 0x6002 {
-                println!("Write to address {:04X}: {:02X}", address, data);
-            }
 
             // If the address is 0x6002 and the data is 0xFF, then we want to turn on the LED
             if address == 0x6002 && data == 0xFF {
@@ -67,9 +63,8 @@ pub mod emulator {
 
             // Print the LED strip
             unsafe {
-                print!("LED strip: ");
                 for i in 0..8 {
-                    print!("{}", if LED_STRIP[i] { "X" } else { " " });
+                    print!("{}", if LED_STRIP[i] { "█" } else { " " });
                 }
                 println!();
             }

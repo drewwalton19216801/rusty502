@@ -19,6 +19,8 @@ pub mod cpu {
         pub addr_rel: u16, // Relative address
         pub opcode: u8, // Current opcode
         pub fetched: u8, // Fetched data
+
+        pub enableIllegalOpcodes: bool, // Enable illegal opcodes
     }
 
     pub enum Variant {
@@ -49,11 +51,17 @@ pub mod cpu {
                 addr_rel: 0,
                 opcode: 0,
                 fetched: 0,
+
+                enableIllegalOpcodes: false,
             }
         }
 
         pub fn change_variant(&mut self, variant: Variant) {
             self.variant = variant;
+        }
+
+        pub fn set_illegal_opcodes(&mut self, enable: bool) {
+            self.enableIllegalOpcodes = enable;
         }
 
         pub fn reset(&mut self) {

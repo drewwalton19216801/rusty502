@@ -133,7 +133,7 @@ pub mod instructions {
         Instruction { opcode: 0x67, name: "RRA", mode: AddressingMode::ZeroPage, cycles: 5, function: crate::cpu::Cpu::rra },
         Instruction { opcode: 0x68, name: "PLA", mode: AddressingMode::Implied, cycles: 4, function: crate::cpu::Cpu::pla },
         Instruction { opcode: 0x69, name: "ADC", mode: AddressingMode::Immediate, cycles: 2, function: crate::cpu::Cpu::adc },
-        Instruction { opcode: 0x6A, name: "ROR", mode: AddressingMode::Implied, cycles: 2, function: crate::cpu::Cpu::ror },
+        Instruction { opcode: 0x6A, name: "RORA", mode: AddressingMode::Implied, cycles: 2, function: crate::cpu::Cpu::ror_a },
         Instruction { opcode: 0x6B, name: "ARR", mode: AddressingMode::Immediate, cycles: 2, function: crate::cpu::Cpu::arr },
         Instruction { opcode: 0x6C, name: "JMP", mode: AddressingMode::Indirect, cycles: 5, function: crate::cpu::Cpu::jmp },
         Instruction { opcode: 0x6D, name: "ADC", mode: AddressingMode::Absolute, cycles: 4, function: crate::cpu::Cpu::adc },

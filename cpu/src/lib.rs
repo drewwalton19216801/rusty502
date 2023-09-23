@@ -17,12 +17,14 @@ pub mod cpu {
         pub temp: u16, // Temporary storage for various operations
         pub addr_abs: u16, // Absolute address
         pub addr_rel: u16, // Relative address
+        pub addr_mode: AddressingMode, // Addressing mode
         pub opcode: u8, // Current opcode
         pub fetched: u8, // Fetched data
 
         pub enable_illegal_opcodes: bool, // Enable illegal opcodes
     }
 
+    #[derive(Clone, Copy, PartialEq)]
     pub enum Variant {
         NMOS, // Original 6502 (with ROR bug)
         CMOS, // Modified 65C02 (no ROR bug)
@@ -49,6 +51,7 @@ pub mod cpu {
                 temp: 0,
                 addr_abs: 0,
                 addr_rel: 0,
+                addr_mode: AddressingMode::Implied,
                 opcode: 0,
                 fetched: 0,
 
@@ -161,6 +164,9 @@ pub mod cpu {
         }
 
         pub fn addr_mode(&mut self, mode: AddressingMode) -> u8 {
+            // Set the addressing mode
+            self.addr_mode = mode;
+
             // Execute the addressing mode
             match mode {
                 AddressingMode::Implied => return self.addr_implied(),
@@ -373,6 +379,28 @@ pub mod cpu {
             return 0;
         }
         pub fn brk(&mut self) -> u8 {
+            // Increment the program counter
+            self.registers.pc += 1;
+
+            // Set the interrupt disable flag to 1
+            self.registers.set_flag(registers::registers::Flag::InterruptDisable, true);
+
+            // Push the PC to the stack
+            self.push_word(self.registers.pc);
+
+            // Set the break flag
+            self.registers.set_flag(registers::registers::Flag::Break, true);
+
+            // Push the flags to the stack
+            self.push(self.registers.flags);
+
+            // Clear the break flag
+            self.registers.set_flag(registers::registers::Flag::Break, false);
+
+            // Set the PC to the data at the interrupt vector
+            self.registers.pc = self.read_word(addresses::IRQ_VECTOR);
+
+            // Return the number of cycles required
             return 0;
         }
         pub fn bvc(&mut self) -> u8 {
@@ -424,13 +452,28 @@ pub mod cpu {
             return 0;
         }
         pub fn jmp(&mut self) -> u8 {
+            // Set the program counter to the absolute address
+            self.registers.pc = self.addr_abs;
+
+            // Return the number of cycles required
             return 0;
         }
         pub fn jsr(&mut self) -> u8 {
             return 0;
         }
         pub fn lda(&mut self) -> u8 {
-            return 0;
+            // Fetch the next byte from memory
+            self.fetch();
+
+            // Load the fetched byte into the accumulator
+            self.registers.a = self.fetched;
+
+            // Set the Zero and Negative flags
+            self.registers.set_flag(registers::registers::Flag::Zero, self.registers.a == 0x00);
+            self.registers.set_flag(registers::registers::Flag::Negative, (self.registers.a & 0x80) > 0);
+
+            // Return the number of cycles required
+            return 1;
         }
         pub fn ldx(&mut self) -> u8 {
             return 0;
@@ -462,7 +505,137 @@ pub mod cpu {
         pub fn rol(&mut self) -> u8 {
             return 0;
         }
+        pub fn ror_a(&mut self) -> u8 {
+            // If the variant is NMOS, use the NMOS ROR instruction,
+            // otherwise use the CMOS ROR instruction
+            if self.variant == Variant::NMOS {
+                return self.ror_a_nmos();
+            } else {
+                return self.ror_a_cmos();
+            }
+        }
         pub fn ror(&mut self) -> u8 {
+            // If the variant is NMOS, use the NMOS ROR instruction,
+            // otherwise use the CMOS ROR instruction
+            if self.variant == Variant::NMOS {
+                return self.ror_nmos();
+            } else {
+                return self.ror_cmos();
+            }
+        }
+        fn ror_a_nmos(&mut self) -> u8 {
+            // Load the accumulator into the temporary variable
+            self.temp = self.registers.a as u16;
+
+            // Set the 9th bit of the temp variable to 0
+            self.temp &= 0x7F;
+
+            // Shift the temp variable left by 1 bit
+            self.temp <<= 1;
+
+            // Mask the temp variable to 8 bits
+            self.temp &= 0xFF;
+
+            // Set the negative flag if the 8th bit of the temp variable is 1
+            self.registers.set_flag(registers::registers::Flag::Negative, (self.temp & 0x80) > 0);
+
+            // Set the zero flag if the temp variable is 0
+            self.registers.set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
+
+            // If the addressing mode is immediate, store the temp variable in the accumulator
+            if self.addr_mode == AddressingMode::Immediate {
+                self.registers.a = self.temp as u8;
+            } else {
+                // Store the temp variable in memory
+                self.write(self.addr_abs, self.temp as u8);
+            }
+
+            // Return the number of extra cycles required
+            return 0;
+        }
+        fn ror_a_cmos(&mut self) -> u8 {
+            // Load the accumulator into the temporary variable
+            self.temp = self.registers.a as u16;
+
+            // If the carry flag is set, set the 9th bit of the temp variable
+            if self.registers.get_flag(registers::registers::Flag::Carry) {
+                self.temp |= 0x100;
+            }
+
+            // Set the carry flag if the 9th bit of the temp variable is 1
+            self.registers.set_flag(registers::registers::Flag::Carry, (self.temp & 0x01) > 0);
+
+            // Shift the temp variable right by 1 bit
+            self.temp >>= 1;
+
+            // Mask the temp variable to 8 bits
+            self.temp &= 0xFF;
+
+            // Set the negative flag if the 8th bit of the temp variable is 1
+            self.registers.set_flag(registers::registers::Flag::Negative, (self.temp & 0x80) > 0);
+
+            // Set the zero flag if the temp variable is 0
+            self.registers.set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
+
+            // Store the temp variable in the accumulator
+            self.registers.a = self.temp as u8;
+
+            // Return the number of extra cycles required
+            return 0;
+        }
+        fn ror_nmos(&mut self) -> u8 {
+            // Load the next byte from memory into the temporary variable
+            self.temp = self.fetch() as u16;
+
+            // Set the 9th bit of the temp variable to 0
+            self.temp &= 0x7F;
+
+            // Shift the temp variable left by 1 bit
+            self.temp <<= 1;
+
+            // Mask the temp variable to 8 bits
+            self.temp &= 0xFF;
+
+            // Set the carry flag if the 8th bit of the temp variable is 1
+            self.registers.set_flag(registers::registers::Flag::Carry, (self.temp & 0x80) > 0);
+
+            // Set the negative flag if the temp variable is 0
+            self.registers.set_flag(registers::registers::Flag::Negative, self.temp == 0x00);
+
+            // Store the temp variable in memory
+            self.write(self.addr_abs, self.temp as u8);
+
+            // Return the number of extra cycles required
+            return 0;
+        }
+        fn ror_cmos(&mut self) -> u8 {
+            // Load the next byte from memory into the temporary variable
+            self.temp = self.fetch() as u16;
+            
+            // If the carry flag is set, set the 9th bit of the temp variable
+            if self.registers.get_flag(registers::registers::Flag::Carry) {
+                self.temp |= 0x100;
+            }
+
+            // Set the carry flag if the 9th bit of the temp variable is 1
+            self.registers.set_flag(registers::registers::Flag::Carry, (self.temp & 0x01) > 0);
+
+            // Shift the temp variable right by 1 bit
+            self.temp >>= 1;
+
+            // Mask the temp variable to 8 bits
+            self.temp &= 0xFF;
+
+            // Set the negative flag if the temp variable is 0
+            self.registers.set_flag(registers::registers::Flag::Negative, self.temp == 0x00);
+
+            // Set the zero flag if the temp variable is 0
+            self.registers.set_flag(registers::registers::Flag::Zero, self.temp == 0x00);
+
+            // Store the temp variable in memory
+            self.write(self.addr_abs, self.temp as u8);
+
+            // Return the number of extra cycles required
             return 0;
         }
         pub fn rti(&mut self) -> u8 {
@@ -484,6 +657,10 @@ pub mod cpu {
             return 0;
         }
         pub fn sta(&mut self) -> u8 {
+            // Store the accumulator in memory
+            self.write(self.addr_abs, self.registers.a);
+
+            // Return the number of cycles required
             return 0;
         }
         pub fn stx(&mut self) -> u8 {

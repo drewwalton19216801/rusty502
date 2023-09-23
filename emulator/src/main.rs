@@ -10,8 +10,8 @@ mod emulator;
  *  -r, --rom: The path to the ROM file to load
  *  -a, --address: The address to load the ROM at (default: 0x8000)
  *  -v, --variant: The variant of the CPU to use
- *     - NMOS: The CMOS 6502 CPU
- *     - CMOS: The NMOS 65C02 CPU (default)
+ *     - NMOS: The NMOS 6502 CPU
+ *     - CMOS: The CMOS 65C02 CPU (default)
  *     - NES: The NES CPU (Ricoh 2A03)
  *  -b, --benchmark: Runs demos/blink.bin for 1000000 cycles and prints the results"
  *  -h, --help: Prints the help message
@@ -94,10 +94,10 @@ fn print_help() {
     println!("Usage: emulator [OPTIONS]");
     println!("Options:");
     println!("  -r, --rom: The path to the ROM file to load");
-    println!("  -a, --address: The address to load the ROM at (default: 0x8000)");
+    println!("  -a, --address: The address to load the ROM at (default: 0xC000)");
     println!("  -v, --variant: The variant of the CPU to use");
-    println!("     - NMOS: The CMOS 6502 CPU");
-    println!("     - CMOS: The NMOS 65C02 CPU (default)");
+    println!("     - NMOS: The MMOS 6502 CPU");
+    println!("     - CMOS: The CMOS 65C02 CPU (default)");
     println!("     - NES: The NES CPU (Ricoh 2A03)");
     println!("  -b, --benchmark: Runs demos/blink.bin for 200,000,000 cycles and prints the results");
     println!("  -h, --help: Prints the help message");

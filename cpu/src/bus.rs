@@ -6,16 +6,20 @@ pub mod bus {
         // Store 64K of RAM on the heap
         pub ram: Box<[u8; 64 * 1024]>,
 
-        pub read_hooks: Vec<Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>>,
-        pub write_hooks: Vec<Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>>,
+        pub hooks: Vec<Option<Hook>>,
+    }
+
+    #[derive(Clone)]
+    pub struct Hook {
+        pub read: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>,
+        pub write: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>,
     }
 
     impl Bus {
         pub fn new() -> Self {
             Self {
                 ram: Box::new([0; 64 * 1024]),
-                read_hooks: vec![None; 64 * 1024],
-                write_hooks: vec![None; 64 * 1024],
+                hooks: vec![None; 64 * 1024],
             }
         }
 
@@ -25,47 +29,37 @@ pub mod bus {
             }
         }
 
-        pub fn add_read_hook(&mut self, address: u16, hook: Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>) {
-            self.read_hooks[address as usize] = Some(hook);
+        pub fn add_hook(&mut self, address: u16, hook: Hook) {
+            self.hooks[address as usize] = Some(hook);
         }
 
-        pub fn add_write_hook(&mut self, address: u16, hook: Arc<Mutex<dyn FnMut(u16, u8) + Send>>) {
-            self.write_hooks[address as usize] = Some(hook);
-        }
-
-        pub fn add_read_hook_range(&mut self, start_address: u16, end_address: u16, hook: Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>) {
+        pub fn add_hook_range(&mut self, start_address: u16, end_address: u16, hook: Hook) {
             for address in start_address..=end_address {
-                self.read_hooks[address as usize] = Some(hook.clone());
-            }
-        }
-        
-        pub fn add_write_hook_range(&mut self, start_address: u16, end_address: u16, hook: Arc<Mutex<dyn FnMut(u16, u8) + Send>>) {
-            for address in start_address..=end_address {
-                self.write_hooks[address as usize] = Some(hook.clone());
+                self.hooks[address as usize] = Some(hook.clone());
             }
         }
 
-        pub fn read(&self, address: u16) -> u8 {
-            // Check if there is a read hook for this address,
-            // and if so, call it
-            if let Some(hook) = &self.read_hooks[address as usize] {
-                let mut hook = hook.lock().unwrap();
-                return hook(address);
+        pub fn read_byte(&self, address: u16) -> u8 {
+            if let Some(hook) = &self.hooks[address as usize] {
+                if let Some(read_hook) = &hook.read {
+                    read_hook.lock().unwrap()(address)
+                } else {
+                    self.ram[address as usize]
+                }
             } else {
-                // Otherwise, just read from RAM
-                return self.ram[address as usize];
+                self.ram[address as usize]
             }
         }
-    
-        pub fn write(&mut self, address: u16, data: u8) {
-            // For debugging, we want to write to RAM anyway
-            self.ram[address as usize] = data;
-    
-            // Check if there is a write hook for this address,
-            // and if so, call it
-            if let Some(hook) = &self.write_hooks[address as usize] {
-                let mut hook = hook.lock().unwrap();
-                hook(address, data);
+
+        pub fn write_byte(&mut self, address: u16, value: u8) {
+            if let Some(hook) = &self.hooks[address as usize] {
+                if let Some(write_hook) = &hook.write {
+                    write_hook.lock().unwrap()(address, value)
+                } else {
+                    self.ram[address as usize] = value;
+                }
+            } else {
+                self.ram[address as usize] = value;
             }
         }
     }
@@ -79,46 +73,46 @@ pub mod bus {
             let mut bus = Bus::new();
             let rom = [0x01, 0x02, 0x03];
             bus.load_rom_at(&rom, 0x8000);
-            assert_eq!(bus.read(0x8000), 0x01);
-            assert_eq!(bus.read(0x8001), 0x02);
-            assert_eq!(bus.read(0x8002), 0x03);
+            assert_eq!(bus.read_byte(0x8000), 0x01);
+            assert_eq!(bus.read_byte(0x8001), 0x02);
+            assert_eq!(bus.read_byte(0x8002), 0x03);
         }
 
         #[test]
-        fn test_add_read_hook() {
+        fn test_add_hook() {
             let mut bus = Bus::new();
             let hook = Arc::new(Mutex::new(|address| {
                 if address == 0x1234 {
-                    return 0x42;
+                    0x42
                 } else {
-                    return 0x00;
+                    0x00
                 }
             }));
-            bus.add_read_hook(0x1234, hook.clone());
-            assert_eq!(bus.read(0x1234), 0x42);
-            assert_eq!(bus.read(0x5678), 0x00);
-        }
+            bus.add_hook(0x1234, Hook {
+                read: Some(hook.clone()),
+                write: None,
+            });
+            assert_eq!(bus.read_byte(0x1234), 0x42);
 
-        #[test]
-        fn test_add_write_hook() {
-            let mut bus = Bus::new();
-            let hook = Arc::new(Mutex::new(|address, data| {
+            let hook = Arc::new(Mutex::new(|address| {
                 if address == 0x1234 {
-                    assert_eq!(data, 0x42);
+                    0x42
                 } else {
-                    assert_eq!(data, 0x00);
+                    0x00
                 }
             }));
-            bus.add_write_hook(0x1234, hook.clone());
-            bus.write(0x1234, 0x42);
-            bus.write(0x5678, 0x00);
+            bus.add_hook(0x1234, Hook {
+                read: Some(hook.clone()),
+                write: None,
+            });
+            assert_eq!(bus.read_byte(0x1234), 0x42);
         }
 
         #[test]
         fn test_read_write() {
             let mut bus = Bus::new();
-            bus.write(0x1234, 0x42);
-            assert_eq!(bus.read(0x1234), 0x42);
+            bus.write_byte(0x1234, 0x42);
+            assert_eq!(bus.read_byte(0x1234), 0x42);
         }
     }
 }

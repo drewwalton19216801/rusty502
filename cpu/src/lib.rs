@@ -1,5 +1,5 @@
 mod addresses;
-mod bus;
+pub mod bus;
 mod instructions;
 mod registers;
 
@@ -112,7 +112,7 @@ pub mod cpu {
         }
 
         pub fn read(&self, address: u16) -> u8 {
-            self.bus.read(address)
+            self.bus.read_byte(address)
         }
 
         pub fn read_word(&self, address: u16) -> u16 {
@@ -122,7 +122,7 @@ pub mod cpu {
         }
 
         pub fn write(&mut self, address: u16, data: u8) {
-            self.bus.write(address, data)
+            self.bus.write_byte(address, data)
         }
 
         pub fn write_word(&mut self, address: u16, data: u16) {

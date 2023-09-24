@@ -4,6 +4,7 @@ pub mod emulator {
     use std::thread;
 
     use cpu::{self, cpu::Cpu};
+    use cpu::bus::bus::Hook;
 
     // Global variable for the LED strip
     static mut LED_STRIP: [bool; 8] = [false; 8];
@@ -55,7 +56,14 @@ pub mod emulator {
                 .lock()
                 .unwrap()
                 .bus
-                .add_write_hook_range(0x6000, 0x6002, Arc::new(Mutex::new(Self::blink_led)));
+                .add_hook_range(
+                    0x6000,
+                    0x6002,
+                    Hook {
+                        read: None,
+                        write: Some(Arc::new(Mutex::new(Emulator::blink_led))),
+                    },
+                );
 
             // Change the variant to CMOS
             shared_cpu

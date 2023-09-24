@@ -51,17 +51,11 @@ pub mod emulator {
 
             let mut cycles_left = num_cycles.unwrap_or(u64::MAX);
 
-            // Register our test write hook
             shared_cpu
                 .lock()
                 .unwrap()
                 .bus
-                .add_write_hook(0x6000, Arc::new(Mutex::new(Self::blink_led)));
-            shared_cpu
-                .lock()
-                .unwrap()
-                .bus
-                .add_write_hook(0x6002, Arc::new(Mutex::new(Self::blink_led)));
+                .add_write_hook_range(0x6000, 0x6002, Arc::new(Mutex::new(Self::blink_led)));
 
             // Change the variant to CMOS
             shared_cpu

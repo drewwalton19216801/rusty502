@@ -4,7 +4,7 @@ pub mod bus {
     #[derive(Clone)]
     pub struct Bus {
         // Store 64K of RAM on the heap
-        pub ram: Box<[u8; 64 * 1024]>,
+        pub memory: Box<[u8; 64 * 1024]>,
 
         pub hooks: Vec<Option<Hook>>,
     }
@@ -18,14 +18,14 @@ pub mod bus {
     impl Bus {
         pub fn new() -> Self {
             Self {
-                ram: Box::new([0; 64 * 1024]),
+                memory: Box::new([0; 64 * 1024]),
                 hooks: vec![None; 64 * 1024],
             }
         }
 
         pub fn load_rom_at(&mut self, rom: &[u8], address: u16) {
             for (i, &byte) in rom.iter().enumerate() {
-                self.ram[address as usize + i] = byte;
+                self.memory[address as usize + i] = byte;
             }
         }
 
@@ -44,10 +44,10 @@ pub mod bus {
                 if let Some(read_hook) = &hook.read {
                     read_hook.lock().unwrap()(address)
                 } else {
-                    self.ram[address as usize]
+                    self.memory[address as usize]
                 }
             } else {
-                self.ram[address as usize]
+                self.memory[address as usize]
             }
         }
 
@@ -56,10 +56,10 @@ pub mod bus {
                 if let Some(write_hook) = &hook.write {
                     write_hook.lock().unwrap()(address, value)
                 } else {
-                    self.ram[address as usize] = value;
+                    self.memory[address as usize] = value;
                 }
             } else {
-                self.ram[address as usize] = value;
+                self.memory[address as usize] = value;
             }
         }
     }

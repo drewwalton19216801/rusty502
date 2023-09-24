@@ -33,6 +33,18 @@ pub mod bus {
             self.write_hooks[address as usize] = Some(hook);
         }
 
+        pub fn add_read_hook_range(&mut self, start_address: u16, end_address: u16, hook: Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>) {
+            for address in start_address..=end_address {
+                self.read_hooks[address as usize] = Some(hook.clone());
+            }
+        }
+        
+        pub fn add_write_hook_range(&mut self, start_address: u16, end_address: u16, hook: Arc<Mutex<dyn FnMut(u16, u8) + Send>>) {
+            for address in start_address..=end_address {
+                self.write_hooks[address as usize] = Some(hook.clone());
+            }
+        }
+
         pub fn read(&self, address: u16) -> u8 {
             // Check if there is a read hook for this address,
             // and if so, call it

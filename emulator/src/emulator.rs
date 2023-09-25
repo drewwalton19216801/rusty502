@@ -4,7 +4,7 @@ pub mod emulator {
     use std::thread;
 
     use cpu::{self, cpu::Cpu};
-    use cpu::bus::Hook;
+    use cpu::bus::bus::Hook;
 
     // Global variable for the LED strip
     static mut LED_STRIP: [bool; 8] = [false; 8];
@@ -43,7 +43,7 @@ pub mod emulator {
         pub fn change_variant(&mut self, variant: String) {
             // Change the variant of the CPU
             self.cpu
-                .change_variant(cpu::cpu::Variant::from_string(&variant));
+                .change_variant(cpu::cpu::Variant::from_string(variant));
         }
 
         // Run the emulator for a certain number of cycles (optional)

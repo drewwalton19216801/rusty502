@@ -1,12 +1,12 @@
 mod addresses;
-pub mod bus;
 mod instructions;
 mod registers;
 
 pub mod cpu {
+    use std::sync::{Mutex, Arc};
+
     use crate::addresses::addresses;
     use crate::{
-        bus::bus::Bus,
         instructions::{
             self,
             instructions::{execute_instruction, AddressingMode},
@@ -19,7 +19,9 @@ pub mod cpu {
         pub variant: Variant,     // CPU variant
         pub state: State,         // CPU state
         pub registers: Registers, // Registers
-        pub bus: Bus,             // Main bus
+        // Bus read function pointer
+        pub bus_read_byte: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>,
+        pub bus_write_byte: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>,
 
         pub cycles: u8,    // Number of cycles remaining for current instruction
         pub temp: u16,     // Temporary storage for various operations
@@ -68,10 +70,11 @@ pub mod cpu {
     }
 
     impl Cpu {
-        pub fn new() -> Self {
+        pub fn new(bus_read_byte: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>, bus_write_byte: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>) -> Self {
             Self {
                 registers: Registers::new(),
-                bus: Bus::new(),
+                bus_read_byte: bus_read_byte,
+                bus_write_byte: bus_write_byte,
                 variant: Variant::CMOS,
                 state: State::Stopped,
 
@@ -112,7 +115,7 @@ pub mod cpu {
         }
 
         pub fn read(&self, address: u16) -> u8 {
-            self.bus.read_byte(address)
+            self.bus_read_byte.as_ref().unwrap().lock().unwrap()(address)
         }
 
         pub fn read_word(&self, address: u16) -> u16 {
@@ -122,7 +125,7 @@ pub mod cpu {
         }
 
         pub fn write(&mut self, address: u16, data: u8) {
-            self.bus.write_byte(address, data)
+            self.bus_write_byte.as_ref().unwrap().lock().unwrap()(address, data);
         }
 
         pub fn write_word(&mut self, address: u16, data: u16) {

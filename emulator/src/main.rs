@@ -1,3 +1,4 @@
+use crate::emulator::Emulator;
 use std::env;
 
 mod emulator;
@@ -5,7 +6,7 @@ mod emulator;
 /**
  * This is the main function for the emulator. It parses the command line arguments and
  * runs the emulator.
- * 
+ *
  * The command line arguments are as follows:
  *  -r, --rom: The path to the ROM file to load
  *  -a, --address: The address to load the ROM at (default: 0xC000)
@@ -24,7 +25,8 @@ fn main() {
     let (rom_path, address, variant, speed, benchmark_mode) = parse_args(args);
 
     // Create the emulator
-    let mut emulator = emulator::emulator::Emulator::new();
+    let mut emulator = Emulator::new();
+    emulator.init();
 
     // If benchmark mode is enabled, run the benchmark
     if benchmark_mode {
@@ -39,8 +41,8 @@ fn main() {
     emulator.change_variant(variant);
 
     // Run the emulator
-    emulator.run(speed, None);
-    
+    emulator.run(speed, None, false);
+
     println!();
 }
 
@@ -102,6 +104,8 @@ fn print_help() {
     println!("     - CMOS: The CMOS 65C02 CPU (default)");
     println!("     - NES: The NES CPU (Ricoh 2A03)");
     println!("  -s, --speed: The speed of the CPU in MHz (default: 0.000100 (100 Hz))");
-    println!("  -b, --benchmark: Runs demos/blink.bin for 200,000,000 cycles and prints the results");
+    println!(
+        "  -b, --benchmark: Runs demos/blink.bin for 200,000,000 cycles and prints the results"
+    );
     println!("  -h, --help: Prints the help message");
 }

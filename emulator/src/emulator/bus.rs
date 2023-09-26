@@ -1,32 +1,30 @@
 /**
  * This represents the system bus of the emulator.
- * 
+ *
  * All of the components of the system are connected to this bus,
  * and they use a hook system (implemented here) to interact with the bus.
  */
-
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, sync::{Mutex, Arc}};
 
 #[derive(Clone)]
 pub struct Hook {
-    // Hooks should be able to read and write address ranges
-    pub read: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send + Sync>>>,
-    pub write: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send + Sync>>>,
+    pub read: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>,
+    pub write: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>,
 }
 
+#[derive(Clone)]
 pub struct Bus {
     // The memory of the system (includes ROM)
-    memory: Vec<u8>,
+    pub memory: [u8; 0xFFFF + 1],
 
-    // The hooks for the system
+    // The hooks for the system, must be able to implement Copy
     hooks: HashMap<u16, Hook>,
 }
 
 impl Bus {
     pub fn new() -> Self {
         Self {
-            memory: vec![0; 0xFFFF],
+            memory: [0; 0xFFFF + 1],
             hooks: HashMap::new(),
         }
     }
@@ -47,7 +45,9 @@ impl Bus {
             // Check if the hook has a read function
             if let Some(read) = &mut hook.read {
                 // Call the read function
-                return read.lock().unwrap()(address);
+                let data = read.lock().unwrap()(address);
+                println!("Read byte from address 0x{:04X}: 0x{:02X}", address, data);
+                return data;
             }
         }
 

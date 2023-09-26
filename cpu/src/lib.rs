@@ -3,7 +3,7 @@ mod instructions;
 mod registers;
 
 pub mod cpu {
-    use std::sync::{Mutex, Arc};
+    use std::sync::{Arc, Mutex};
 
     use crate::addresses::addresses;
     use crate::{
@@ -14,14 +14,17 @@ pub mod cpu {
         registers::{self, registers::Registers},
     };
 
-    #[derive(Clone)]
+    pub trait BusFunction: FnMut(u16) -> u8 + Send + 'static {}
+
+    impl<T> BusFunction for T where T: FnMut(u16) -> u8 + Send + 'static {}
+
     pub struct Cpu {
         pub variant: Variant,     // CPU variant
         pub state: State,         // CPU state
         pub registers: Registers, // Registers
         // Bus read function pointer
-        pub read_byte: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>,
-        pub write_byte: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>,
+        pub read_byte: Option<Arc<Mutex<dyn FnMut(u16) -> u8>>>,
+        pub write_byte: Option<Arc<Mutex<dyn FnMut(u16, u8) -> ()>>>,
 
         pub cycles: u8,    // Number of cycles remaining for current instruction
         pub temp: u16,     // Temporary storage for various operations
@@ -73,8 +76,6 @@ pub mod cpu {
         pub fn new() -> Self {
             Self {
                 registers: Registers::new(),
-                read_byte: None,
-                write_byte: None,
                 variant: Variant::CMOS,
                 state: State::Stopped,
 
@@ -87,15 +88,35 @@ pub mod cpu {
                 fetched: 0,
 
                 enable_illegal_opcodes: false,
+
+                read_byte: None,
+                write_byte: None,
             }
         }
 
-        pub fn connect_read_byte(&mut self, func: Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>) {
-            self.read_byte = Some(func);
+        pub fn connect_read_byte(&mut self, read_fn: Arc<Mutex<dyn FnMut(u16) -> u8>>) {
+            self.read_byte = Some(read_fn);
         }
 
-        pub fn connect_write_byte(&mut self, func: Arc<Mutex<dyn FnMut(u16, u8) + Send>>) {
-            self.write_byte = Some(func);
+        pub fn connect_write_byte(&mut self, write_fn: Arc<Mutex<dyn FnMut(u16, u8) -> ()>>) {
+            self.write_byte = Some(write_fn);
+        }
+
+        pub fn read_byte(&mut self, address: u16) -> u8 {
+            if let Some(read_byte_fn) = &mut self.read_byte {
+                // Read from the bus
+                return read_byte_fn.lock().unwrap()(address);
+            } else {
+                // There's no bus function, so return 0
+                0
+            }
+        }
+
+        pub fn write_byte(&mut self, address: u16, value: u8) {
+            if let Some(write_byte_fn) = &mut self.write_byte {
+                // Write to the bus
+                write_byte_fn.lock().unwrap()(address, value);
+            }
         }
 
         pub fn dump_cycles(&self) {
@@ -122,18 +143,18 @@ pub mod cpu {
             self.cycles = 8;
         }
 
-        pub fn read(&self, address: u16) -> u8 {
-            self.read_byte.as_ref().unwrap().lock().unwrap()(address)
+        pub fn read(&mut self, address: u16) -> u8 {
+            return self.read_byte(address);
         }
 
-        pub fn read_word(&self, address: u16) -> u16 {
+        pub fn read_word(&mut self, address: u16) -> u16 {
             let lo = self.read(address) as u16;
             let hi = self.read(address + 1) as u16;
             return (hi << 8) | lo;
         }
 
         pub fn write(&mut self, address: u16, data: u8) {
-            self.write_byte.as_ref().unwrap().lock().unwrap()(address, data);
+            self.write_byte(address, data);
         }
 
         pub fn write_word(&mut self, address: u16, data: u16) {
@@ -184,6 +205,7 @@ pub mod cpu {
                 // Set state to fetching
                 self.state = State::Fetching;
                 self.opcode = self.read(self.registers.pc);
+                println!("Opcode: {:02X}", self.opcode);
                 self.registers.pc += 1;
 
                 // Get the number of cycles for this opcode

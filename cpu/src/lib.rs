@@ -20,8 +20,8 @@ pub mod cpu {
         pub state: State,         // CPU state
         pub registers: Registers, // Registers
         // Bus read function pointer
-        pub bus_read_byte: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>,
-        pub bus_write_byte: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>,
+        pub read_byte: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>,
+        pub write_byte: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>,
 
         pub cycles: u8,    // Number of cycles remaining for current instruction
         pub temp: u16,     // Temporary storage for various operations
@@ -70,11 +70,11 @@ pub mod cpu {
     }
 
     impl Cpu {
-        pub fn new(bus_read_byte: Option<Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>>, bus_write_byte: Option<Arc<Mutex<dyn FnMut(u16, u8) + Send>>>) -> Self {
+        pub fn new() -> Self {
             Self {
                 registers: Registers::new(),
-                bus_read_byte: bus_read_byte,
-                bus_write_byte: bus_write_byte,
+                read_byte: None,
+                write_byte: None,
                 variant: Variant::CMOS,
                 state: State::Stopped,
 
@@ -88,6 +88,14 @@ pub mod cpu {
 
                 enable_illegal_opcodes: false,
             }
+        }
+
+        pub fn connect_read_byte(&mut self, func: Arc<Mutex<dyn FnMut(u16) -> u8 + Send>>) {
+            self.read_byte = Some(func);
+        }
+
+        pub fn connect_write_byte(&mut self, func: Arc<Mutex<dyn FnMut(u16, u8) + Send>>) {
+            self.write_byte = Some(func);
         }
 
         pub fn dump_cycles(&self) {
@@ -115,7 +123,7 @@ pub mod cpu {
         }
 
         pub fn read(&self, address: u16) -> u8 {
-            self.bus_read_byte.as_ref().unwrap().lock().unwrap()(address)
+            self.read_byte.as_ref().unwrap().lock().unwrap()(address)
         }
 
         pub fn read_word(&self, address: u16) -> u16 {
@@ -125,7 +133,7 @@ pub mod cpu {
         }
 
         pub fn write(&mut self, address: u16, data: u8) {
-            self.bus_write_byte.as_ref().unwrap().lock().unwrap()(address, data);
+            self.write_byte.as_ref().unwrap().lock().unwrap()(address, data);
         }
 
         pub fn write_word(&mut self, address: u16, data: u16) {
